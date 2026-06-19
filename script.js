@@ -84,37 +84,114 @@ function getAudioContext() {
     return audioContext;
 }
 
-function playJumpSound() {
-    if (!soundEnabled) return;
+function playTone(audioCtx, options) {
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.type = options.type || "sine";
+
+    oscillator.frequency.setValueAtTime(options.startFrequency, options.startTime);
+
+    if (options.endFrequency) {
+        oscillator.frequency.exponentialRampToValueAtTime(
+            options.endFrequency,
+            options.startTime + options.duration
+        );
+    }
+
+    gainNode.gain.setValueAtTime(0.0001, options.startTime);
+    gainNode.gain.exponentialRampToValueAtTime(
+        options.volume || 0.2,
+        options.startTime + 0.02
+    );
+    gainNode.gain.exponentialRampToValueAtTime(
+        0.0001,
+        options.startTime + options.duration
+    );
+
+    oscillator.start(options.startTime);
+    oscillator.stop(options.startTime + options.duration + 0.02);
+}
+
+function prepareSound() {
+    if (!soundEnabled) return null;
 
     const currentAudioContext = getAudioContext();
 
-    if (!currentAudioContext) return;
+    if (!currentAudioContext) return null;
 
     if (currentAudioContext.state === "suspended") {
         currentAudioContext.resume();
     }
 
-    const oscillator = currentAudioContext.createOscillator();
-    const gainNode = currentAudioContext.createGain();
+    return currentAudioContext;
+}
 
-    oscillator.connect(gainNode);
-    gainNode.connect(currentAudioContext.destination);
+function playJumpSound() {
+    const currentAudioContext = prepareSound();
+
+    if (!currentAudioContext) return;
 
     const now = currentAudioContext.currentTime;
 
-    oscillator.type = "sine";
+    playTone(currentAudioContext, {
+        type: "sine",
+        startFrequency: 260,
+        endFrequency: 620,
+        startTime: now,
+        duration: 0.18,
+        volume: 0.25
+    });
+}
 
-    oscillator.frequency.setValueAtTime(260, now);
-    oscillator.frequency.exponentialRampToValueAtTime(620, now + 0.08);
-    oscillator.frequency.exponentialRampToValueAtTime(420, now + 0.16);
+function playWinSound() {
+    const currentAudioContext = prepareSound();
 
-    gainNode.gain.setValueAtTime(0.0001, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.25, now + 0.02);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    if (!currentAudioContext) return;
 
-    oscillator.start(now);
-    oscillator.stop(now + 0.2);
+    const now = currentAudioContext.currentTime;
+
+    const winNotes = [523, 659, 784, 1046];
+
+    winNotes.forEach(function(frequency, index) {
+        playTone(currentAudioContext, {
+            type: "triangle",
+            startFrequency: frequency,
+            endFrequency: frequency * 1.05,
+            startTime: now + index * 0.12,
+            duration: 0.16,
+            volume: 0.23
+        });
+    });
+}
+
+function playLoseSound() {
+    const currentAudioContext = prepareSound();
+
+    if (!currentAudioContext) return;
+
+    const now = currentAudioContext.currentTime;
+
+    playTone(currentAudioContext, {
+        type: "sawtooth",
+        startFrequency: 260,
+        endFrequency: 90,
+        startTime: now,
+        duration: 0.45,
+        volume: 0.22
+    });
+
+    playTone(currentAudioContext, {
+        type: "triangle",
+        startFrequency: 120,
+        endFrequency: 60,
+        startTime: now + 0.2,
+        duration: 0.35,
+        volume: 0.18
+    });
 }
 
 function jump() {
@@ -167,6 +244,7 @@ function checkCollision() {
     if (isColliding) {
         gameState = "lose";
         messageText.textContent = "패배! 장애물에 부딪혔습니다.";
+        playLoseSound();
         cancelAnimationFrame(animationId);
     }
 }
@@ -180,6 +258,7 @@ function checkWinCondition() {
     if (remainingTime <= 0) {
         gameState = "win";
         messageText.textContent = "승리! 30초 동안 살아남았습니다!";
+        playWinSound();
         cancelAnimationFrame(animationId);
     }
 }
