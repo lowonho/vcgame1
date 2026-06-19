@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>점프 장애물 피하기 게임</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <main class="game-wrap">
+        <h1>점프 장애물 피하기</h1>
+
+        <section class="info-box">
+            <p><strong>조작:</strong> Space 키로 점프</p>
+            <p><strong>목표:</strong> 30초 동안 장애물을 피하면 승리</p>
+            <p><strong>효과음:</strong> 점프할 때 사운드 재생</p>
+        </section>
+
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+        <div class="status-box">
+            <p id="timerText">남은 시간: 30초</p>
+            <p id="messageText">Space 키를 눌러 게임 시작</p>
+        </div>
+
+        <div class="button-box">
+            <button id="restartButton">다시 시작</button>
+            <button id="soundButton">효과음 ON</button>
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
