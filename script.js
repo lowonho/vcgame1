@@ -6,11 +6,22 @@ const messageText = document.getElementById("messageText");
 const restartButton = document.getElementById("restartButton");
 const soundButton = document.getElementById("soundButton");
 
+const nicknameBox = document.getElementById("nicknameBox");
+const resultSummaryText = document.getElementById("resultSummaryText");
+const nicknameInput = document.getElementById("nicknameInput");
+const saveLogButton = document.getElementById("saveLogButton");
+const nicknameErrorText = document.getElementById("nicknameErrorText");
+
+const rankingList = document.getElementById("rankingList");
+const emptyRankingText = document.getElementById("emptyRankingText");
+const clearRankingButton = document.getElementById("clearRankingButton");
+
 const CANVAS_WIDTH = canvas.width;
 const CANVAS_HEIGHT = canvas.height;
 
 const GROUND_Y = 320;
 const GAME_TIME = 30;
+const RANKING_STORAGE_KEY = "jumpObstacleGameRankings";
 
 let gameState = "ready";
 // ready, playing, win, lose
@@ -20,6 +31,10 @@ let animationId = null;
 
 let audioContext = null;
 let soundEnabled = true;
+
+let currentGameResult = null;
+let finalSurvivalTime = 0;
+let currentResultSaved = false;
 
 const player = {
     x: 100,
@@ -52,9 +67,14 @@ function resetGame() {
     obstacle.speed = 7;
 
     startTime = 0;
+    currentGameResult = null;
+    finalSurvivalTime = 0;
+    currentResultSaved = false;
 
     timerText.textContent = `남은 시간: ${GAME_TIME}초`;
     messageText.textContent = "Space 키를 눌러 게임 시작";
+
+    hideNicknameBox();
 
     cancelAnimationFrame(animationId);
     drawGame();
@@ -67,6 +87,7 @@ function startGame() {
     startTime = Date.now();
     messageText.textContent = "장애물을 피하세요!";
 
+    hideNicknameBox();
     gameLoop();
 }
 
@@ -234,6 +255,37 @@ function updateObstacle() {
     }
 }
 
+function getElapsedSeconds() {
+    if (startTime === 0) return 0;
+
+    const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+    return Math.min(elapsedTime, GAME_TIME);
+}
+
+function endGame(result) {
+    if (gameState !== "playing") return;
+
+    gameState = result;
+    currentGameResult = result;
+    finalSurvivalTime = getElapsedSeconds();
+
+    cancelAnimationFrame(animationId);
+
+    if (result === "win") {
+        messageText.textContent = "승리! 30초 동안 살아남았습니다!";
+        timerText.textContent = "남은 시간: 0초";
+        playWinSound();
+    }
+
+    if (result === "lose") {
+        messageText.textContent = "패배! 장애물에 부딪혔습니다.";
+        playLoseSound();
+    }
+
+    showNicknameBox();
+    drawGame();
+}
+
 function checkCollision() {
     const isColliding =
         player.x < obstacle.x + obstacle.width &&
@@ -242,24 +294,18 @@ function checkCollision() {
         player.y + player.height > obstacle.y;
 
     if (isColliding) {
-        gameState = "lose";
-        messageText.textContent = "패배! 장애물에 부딪혔습니다.";
-        playLoseSound();
-        cancelAnimationFrame(animationId);
+        endGame("lose");
     }
 }
 
 function checkWinCondition() {
-    const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+    const elapsedTime = getElapsedSeconds();
     const remainingTime = GAME_TIME - elapsedTime;
 
     timerText.textContent = `남은 시간: ${Math.max(remainingTime, 0)}초`;
 
     if (remainingTime <= 0) {
-        gameState = "win";
-        messageText.textContent = "승리! 30초 동안 살아남았습니다!";
-        playWinSound();
-        cancelAnimationFrame(animationId);
+        endGame("win");
     }
 }
 
@@ -336,7 +382,7 @@ function drawResultOverlay() {
     }
 
     ctx.font = "24px Arial";
-    ctx.fillText("다시 시작 버튼을 눌러 재도전하세요", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
+    ctx.fillText("닉네임을 입력해 기록을 남겨보세요", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
 
     ctx.textAlign = "left";
 }
@@ -372,13 +418,185 @@ function gameLoop() {
     animationId = requestAnimationFrame(gameLoop);
 }
 
+function showNicknameBox() {
+    nicknameBox.classList.remove("hidden");
+    nicknameInput.value = "";
+    nicknameErrorText.textContent = "";
+    saveLogButton.disabled = false;
+    saveLogButton.textContent = "기록 저장";
+
+    if (currentGameResult === "win") {
+        resultSummaryText.textContent = `승리 기록! 생존 시간: ${finalSurvivalTime}초`;
+    }
+
+    if (currentGameResult === "lose") {
+        resultSummaryText.textContent = `패배 기록. 생존 시간: ${finalSurvivalTime}초`;
+    }
+
+    setTimeout(function() {
+        nicknameInput.focus();
+    }, 100);
+}
+
+function hideNicknameBox() {
+    nicknameBox.classList.add("hidden");
+    nicknameInput.value = "";
+    nicknameErrorText.textContent = "";
+}
+
+function loadRankings() {
+    try {
+        const savedRankings = localStorage.getItem(RANKING_STORAGE_KEY);
+
+        if (!savedRankings) {
+            return [];
+        }
+
+        return JSON.parse(savedRankings);
+    } catch (error) {
+        console.error("랭킹 데이터를 불러오지 못했습니다.", error);
+        return [];
+    }
+}
+
+function saveRankings(rankings) {
+    try {
+        localStorage.setItem(RANKING_STORAGE_KEY, JSON.stringify(rankings));
+    } catch (error) {
+        console.error("랭킹 데이터를 저장하지 못했습니다.", error);
+    }
+}
+
+function sortRankings(rankings) {
+    return rankings.sort(function(a, b) {
+        if (b.survivalTime !== a.survivalTime) {
+            return b.survivalTime - a.survivalTime;
+        }
+
+        return b.timestamp - a.timestamp;
+    });
+}
+
+function savePlayerLog() {
+    if (currentResultSaved) {
+        nicknameErrorText.textContent = "이미 이번 게임 기록을 저장했습니다.";
+        return;
+    }
+
+    const nickname = nicknameInput.value.trim();
+
+    if (nickname.length === 0) {
+        nicknameErrorText.textContent = "닉네임을 입력해주세요.";
+        return;
+    }
+
+    if (nickname.length > 10) {
+        nicknameErrorText.textContent = "닉네임은 최대 10글자까지 가능합니다.";
+        return;
+    }
+
+    const rankings = loadRankings();
+
+    const newRecord = {
+        nickname: nickname,
+        result: currentGameResult,
+        survivalTime: finalSurvivalTime,
+        playedAt: new Date().toLocaleString("ko-KR"),
+        timestamp: Date.now()
+    };
+
+    rankings.push(newRecord);
+
+    const sortedRankings = sortRankings(rankings).slice(0, 10);
+
+    saveRankings(sortedRankings);
+    renderRankings();
+
+    currentResultSaved = true;
+    saveLogButton.disabled = true;
+    saveLogButton.textContent = "저장 완료";
+    nicknameErrorText.textContent = "기록이 저장되었습니다!";
+    nicknameErrorText.style.color = "#16a34a";
+}
+
+function renderRankings() {
+    const rankings = loadRankings();
+
+    rankingList.innerHTML = "";
+
+    if (rankings.length === 0) {
+        emptyRankingText.style.display = "block";
+        return;
+    }
+
+    emptyRankingText.style.display = "none";
+
+    rankings.forEach(function(record, index) {
+        const listItem = document.createElement("li");
+        listItem.className = "ranking-item";
+
+        const mainBox = document.createElement("div");
+        mainBox.className = "ranking-main";
+
+        const nameText = document.createElement("div");
+        nameText.className = "ranking-name";
+
+        const resultText = record.result === "win" ? "승리" : "패배";
+        const resultClass = record.result === "win" ? "result-win" : "result-lose";
+        const medal = index === 0 ? "🏆 " : "";
+
+        nameText.textContent = `${medal}${index + 1}위 ${record.nickname}`;
+
+        const metaText = document.createElement("div");
+        metaText.className = "ranking-meta";
+
+        const resultSpan = document.createElement("span");
+        resultSpan.className = resultClass;
+        resultSpan.textContent = resultText;
+
+        metaText.appendChild(resultSpan);
+        metaText.appendChild(document.createTextNode(` · ${record.playedAt}`));
+
+        mainBox.appendChild(nameText);
+        mainBox.appendChild(metaText);
+
+        const scoreText = document.createElement("div");
+        scoreText.className = "ranking-score";
+        scoreText.textContent = `${record.survivalTime}초 생존`;
+
+        listItem.appendChild(mainBox);
+        listItem.appendChild(scoreText);
+
+        rankingList.appendChild(listItem);
+    });
+}
+
+function clearRankings() {
+    const isConfirmed = confirm("저장된 플레이 기록을 모두 삭제할까요?");
+
+    if (!isConfirmed) return;
+
+    localStorage.removeItem(RANKING_STORAGE_KEY);
+    renderRankings();
+}
+
 window.addEventListener("keydown", function(event) {
+    if (document.activeElement === nicknameInput) {
+        return;
+    }
+
     if (event.code === "Space") {
         event.preventDefault();
 
         if (event.repeat) return;
 
         jump();
+    }
+});
+
+nicknameInput.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+        savePlayerLog();
     }
 });
 
@@ -398,4 +616,13 @@ soundButton.addEventListener("click", function() {
     }
 });
 
+saveLogButton.addEventListener("click", function() {
+    savePlayerLog();
+});
+
+clearRankingButton.addEventListener("click", function() {
+    clearRankings();
+});
+
+renderRankings();
 drawGame();

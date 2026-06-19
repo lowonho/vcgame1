@@ -10,8 +10,9 @@ body {
     font-family: Arial, sans-serif;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     color: #1f2937;
+    padding: 40px 0;
 }
 
 .game-wrap {
@@ -99,6 +100,157 @@ button:active {
     transform: translateY(0);
 }
 
+.nickname-box {
+    max-width: 800px;
+    margin: 24px auto 0;
+    padding: 22px;
+    background: #ffffff;
+    border: 3px solid #2563eb;
+    border-radius: 16px;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.15);
+}
+
+.nickname-box h2 {
+    margin-bottom: 10px;
+    font-size: 24px;
+}
+
+#resultSummaryText {
+    margin-bottom: 16px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #2563eb;
+}
+
+.nickname-input-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+#nicknameInput {
+    width: 220px;
+    padding: 12px 14px;
+    border: 2px solid #cbd5e1;
+    border-radius: 999px;
+    font-size: 16px;
+    outline: none;
+}
+
+#nicknameInput:focus {
+    border-color: #2563eb;
+}
+
+#saveLogButton {
+    background: #f97316;
+}
+
+#saveLogButton:hover {
+    background: #ea580c;
+    transform: translateY(-2px);
+}
+
+#nicknameErrorText {
+    margin-top: 10px;
+    min-height: 20px;
+    color: #dc2626;
+    font-weight: bold;
+}
+
+.hidden {
+    display: none;
+}
+
+.ranking-panel {
+    max-width: 800px;
+    margin: 24px auto 0;
+    padding: 22px;
+    background: #ffffff;
+    border: 3px solid #1f2937;
+    border-radius: 16px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+    text-align: left;
+}
+
+.ranking-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.ranking-header h2 {
+    font-size: 24px;
+}
+
+#clearRankingButton {
+    padding: 9px 16px;
+    background: #6b7280;
+    font-size: 14px;
+}
+
+#clearRankingButton:hover {
+    background: #4b5563;
+    transform: translateY(-2px);
+}
+
+#rankingList {
+    list-style-position: inside;
+}
+
+.ranking-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.ranking-item:last-child {
+    border-bottom: none;
+}
+
+.ranking-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ranking-name {
+    font-size: 17px;
+    font-weight: bold;
+}
+
+.ranking-meta {
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.ranking-score {
+    min-width: 120px;
+    text-align: right;
+    font-weight: bold;
+    color: #2563eb;
+}
+
+.result-win {
+    color: #16a34a;
+}
+
+.result-lose {
+    color: #dc2626;
+}
+
+#emptyRankingText {
+    text-align: center;
+    color: #6b7280;
+    font-weight: bold;
+    padding: 16px 0;
+}
+
 @media (max-width: 600px) {
     h1 {
         font-size: 28px;
@@ -118,5 +270,24 @@ button:active {
         width: 140px;
         padding: 11px 16px;
         font-size: 15px;
+    }
+
+    .ranking-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ranking-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ranking-score {
+        text-align: left;
+    }
+
+    #nicknameInput {
+        width: 100%;
+        max-width: 260px;
     }
 }
