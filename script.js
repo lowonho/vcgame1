@@ -6,6 +6,7 @@ const timerText = document.getElementById("timerText");
 const messageText = document.getElementById("messageText");
 const restartButton = document.getElementById("restartButton");
 const soundButton = document.getElementById("soundButton");
+const bgmButton = document.getElementById("bgmButton");
 
 const nicknameBox = document.getElementById("nicknameBox");
 const resultSummaryText = document.getElementById("resultSummaryText");
@@ -75,6 +76,11 @@ let animationId = null;
 let audioContext = null;
 let soundEnabled = true;
 
+let bgmEnabled = true;
+let bgmPlaying = false;
+let bgmTimeoutId = null;
+let bgmGainNode = null;
+
 let currentStage = 1;
 let currentGameResult = null;
 let finalSurvivalTime = 0;
@@ -114,6 +120,7 @@ function resetGame() {
     finalStageReached = 1;
     currentResultSaved = false;
 
+    stopBgm();
     applyStageConfig(STAGES[0], true);
 
     timerText.textContent = `남은 시간: ${GAME_TIME}초`;
@@ -133,6 +140,7 @@ function startGame() {
     messageText.textContent = "1단계 시작! 장애물을 피하세요!";
 
     hideNicknameBox();
+    startBgm();
     gameLoop();
 }
 
@@ -147,6 +155,10 @@ function getAudioContext() {
         audioContext = new AudioContextClass();
     }
 
+    if (audioContext.state === "suspended") {
+        audioContext.resume();
+    }
+
     return audioContext;
 }
 
@@ -154,8 +166,10 @@ function playTone(audioCtx, options) {
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
 
+    const destinationNode = options.destination || audioCtx.destination;
+
     oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
+    gainNode.connect(destinationNode);
 
     oscillator.type = options.type || "sine";
 
@@ -182,22 +196,20 @@ function playTone(audioCtx, options) {
     oscillator.stop(options.startTime + options.duration + 0.02);
 }
 
-function prepareSound() {
+function prepareEffectSound() {
     if (!soundEnabled) return null;
 
-    const currentAudioContext = getAudioContext();
+    return getAudioContext();
+}
 
-    if (!currentAudioContext) return null;
+function prepareBgmSound() {
+    if (!bgmEnabled) return null;
 
-    if (currentAudioContext.state === "suspended") {
-        currentAudioContext.resume();
-    }
-
-    return currentAudioContext;
+    return getAudioContext();
 }
 
 function playJumpSound() {
-    const currentAudioContext = prepareSound();
+    const currentAudioContext = prepareEffectSound();
 
     if (!currentAudioContext) return;
 
@@ -214,7 +226,7 @@ function playJumpSound() {
 }
 
 function playWinSound() {
-    const currentAudioContext = prepareSound();
+    const currentAudioContext = prepareEffectSound();
 
     if (!currentAudioContext) return;
 
@@ -235,7 +247,7 @@ function playWinSound() {
 }
 
 function playLoseSound() {
-    const currentAudioContext = prepareSound();
+    const currentAudioContext = prepareEffectSound();
 
     if (!currentAudioContext) return;
 
@@ -261,7 +273,7 @@ function playLoseSound() {
 }
 
 function playStageUpSound() {
-    const currentAudioContext = prepareSound();
+    const currentAudioContext = prepareEffectSound();
 
     if (!currentAudioContext) return;
 
@@ -283,6 +295,144 @@ function playStageUpSound() {
         startTime: now + 0.12,
         duration: 0.12,
         volume: 0.16
+    });
+}
+
+function getBgmGainNode(audioCtx) {
+    if (!bgmGainNode) {
+        bgmGainNode = audioCtx.createGain();
+        bgmGainNode.gain.value = 0.0001;
+        bgmGainNode.connect(audioCtx.destination);
+    }
+
+    return bgmGainNode;
+}
+
+function startBgm() {
+    if (!bgmEnabled || bgmPlaying) return;
+
+    const currentAudioContext = prepareBgmSound();
+
+    if (!currentAudioContext) return;
+
+    bgmPlaying = true;
+
+    const bgmGain = getBgmGainNode(currentAudioContext);
+    const now = currentAudioContext.currentTime;
+
+    bgmGain.gain.cancelScheduledValues(now);
+    bgmGain.gain.setValueAtTime(0.0001, now);
+    bgmGain.gain.linearRampToValueAtTime(0.08, now + 0.5);
+
+    playBgmLoop();
+}
+
+function stopBgm() {
+    if (bgmTimeoutId) {
+        clearTimeout(bgmTimeoutId);
+        bgmTimeoutId = null;
+    }
+
+    if (bgmGainNode && audioContext) {
+        const now = audioContext.currentTime;
+
+        bgmGainNode.gain.cancelScheduledValues(now);
+        bgmGainNode.gain.setValueAtTime(bgmGainNode.gain.value, now);
+        bgmGainNode.gain.linearRampToValueAtTime(0.0001, now + 0.25);
+    }
+
+    bgmPlaying = false;
+}
+
+function playBgmLoop() {
+    if (!bgmPlaying || !bgmEnabled) return;
+
+    const currentAudioContext = prepareBgmSound();
+
+    if (!currentAudioContext) return;
+
+    const bgmGain = getBgmGainNode(currentAudioContext);
+    const now = currentAudioContext.currentTime;
+
+    const melody = getBgmMelodyByStage();
+
+    melody.forEach(function(note) {
+        playTone(currentAudioContext, {
+            type: "triangle",
+            startFrequency: note.frequency,
+            endFrequency: note.frequency * 1.01,
+            startTime: now + note.time,
+            duration: note.duration,
+            volume: note.volume,
+            destination: bgmGain
+        });
+    });
+
+    playBgmBass(currentAudioContext, bgmGain, now);
+
+    bgmTimeoutId = setTimeout(function() {
+        playBgmLoop();
+    }, 1600);
+}
+
+function getBgmMelodyByStage() {
+    if (currentStage === 1) {
+        return [
+            { frequency: 392, time: 0.0, duration: 0.18, volume: 0.14 },
+            { frequency: 494, time: 0.2, duration: 0.18, volume: 0.14 },
+            { frequency: 523, time: 0.4, duration: 0.18, volume: 0.14 },
+            { frequency: 494, time: 0.6, duration: 0.18, volume: 0.14 },
+            { frequency: 392, time: 0.8, duration: 0.18, volume: 0.14 },
+            { frequency: 330, time: 1.0, duration: 0.18, volume: 0.12 },
+            { frequency: 392, time: 1.2, duration: 0.3, volume: 0.14 }
+        ];
+    }
+
+    if (currentStage === 2) {
+        return [
+            { frequency: 440, time: 0.0, duration: 0.16, volume: 0.15 },
+            { frequency: 523, time: 0.18, duration: 0.16, volume: 0.15 },
+            { frequency: 587, time: 0.36, duration: 0.16, volume: 0.15 },
+            { frequency: 659, time: 0.54, duration: 0.16, volume: 0.15 },
+            { frequency: 587, time: 0.72, duration: 0.16, volume: 0.15 },
+            { frequency: 523, time: 0.9, duration: 0.16, volume: 0.15 },
+            { frequency: 440, time: 1.08, duration: 0.26, volume: 0.15 }
+        ];
+    }
+
+    return [
+        { frequency: 523, time: 0.0, duration: 0.12, volume: 0.16 },
+        { frequency: 659, time: 0.15, duration: 0.12, volume: 0.16 },
+        { frequency: 784, time: 0.3, duration: 0.12, volume: 0.16 },
+        { frequency: 988, time: 0.45, duration: 0.12, volume: 0.16 },
+        { frequency: 784, time: 0.6, duration: 0.12, volume: 0.16 },
+        { frequency: 659, time: 0.75, duration: 0.12, volume: 0.16 },
+        { frequency: 523, time: 0.9, duration: 0.22, volume: 0.16 },
+        { frequency: 659, time: 1.2, duration: 0.22, volume: 0.16 }
+    ];
+}
+
+function playBgmBass(audioCtx, destination, startTime) {
+    const bassFrequency = currentStage === 1 ? 196 : currentStage === 2 ? 220 : 262;
+
+    playTone(audioCtx, {
+        type: "sine",
+        startFrequency: bassFrequency,
+        endFrequency: bassFrequency,
+        startTime: startTime,
+        duration: 0.45,
+        volume: 0.08,
+        destination: destination
+    });
+
+    playTone(audioCtx, {
+        type: "sine",
+        startFrequency: bassFrequency,
+        endFrequency: bassFrequency,
+        startTime: startTime + 0.8,
+        duration: 0.45,
+        volume: 0.08,
+        destination: destination
     });
 }
 
@@ -401,6 +551,7 @@ function endGame(result) {
     finalStageReached = currentStage;
 
     cancelAnimationFrame(animationId);
+    stopBgm();
 
     if (result === "win") {
         messageText.textContent = "승리! 3단계를 모두 클리어했습니다!";
@@ -808,6 +959,23 @@ soundButton.addEventListener("click", function() {
     } else {
         soundButton.textContent = "효과음 OFF";
         soundButton.style.background = "#6b7280";
+    }
+});
+
+bgmButton.addEventListener("click", function() {
+    bgmEnabled = !bgmEnabled;
+
+    if (bgmEnabled) {
+        bgmButton.textContent = "배경음악 ON";
+        bgmButton.style.background = "#8b5cf6";
+
+        if (gameState === "playing") {
+            startBgm();
+        }
+    } else {
+        bgmButton.textContent = "배경음악 OFF";
+        bgmButton.style.background = "#6b7280";
+        stopBgm();
     }
 });
 

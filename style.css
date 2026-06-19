@@ -106,6 +106,15 @@ button {
     transform: translateY(-2px);
 }
 
+#bgmButton {
+    background: #8b5cf6;
+}
+
+#bgmButton:hover {
+    background: #7c3aed;
+    transform: translateY(-2px);
+}
+
 button:active {
     transform: translateY(0);
 }
@@ -281,7 +290,7 @@ button:active {
     }
 
     button {
-        width: 140px;
+        width: 150px;
         padding: 11px 16px;
         font-size: 15px;
     }
