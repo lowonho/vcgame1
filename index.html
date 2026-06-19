@@ -14,12 +14,14 @@
         <section class="info-box">
             <p><strong>조작:</strong> Space 키로 점프</p>
             <p><strong>목표:</strong> 30초 동안 장애물을 피하면 승리</p>
+            <p><strong>난이도:</strong> 10초마다 단계 상승</p>
             <p><strong>기록:</strong> 게임 종료 후 닉네임 저장</p>
         </section>
 
         <canvas id="gameCanvas" width="800" height="400"></canvas>
 
         <div class="status-box">
+            <p id="stageText">현재 단계: 1단계</p>
             <p id="timerText">남은 시간: 30초</p>
             <p id="messageText">Space 키를 눌러 게임 시작</p>
         </div>

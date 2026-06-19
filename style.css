@@ -51,6 +51,16 @@ canvas {
     font-weight: bold;
 }
 
+#stageText {
+    display: inline-block;
+    margin-bottom: 8px;
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: #111827;
+    color: #ffffff;
+    font-size: 18px;
+}
+
 #timerText {
     margin-bottom: 8px;
 }
@@ -230,7 +240,7 @@ button:active {
 }
 
 .ranking-score {
-    min-width: 120px;
+    min-width: 150px;
     text-align: right;
     font-weight: bold;
     color: #2563eb;
@@ -264,6 +274,10 @@ button:active {
 
     .status-box {
         font-size: 18px;
+    }
+
+    #stageText {
+        font-size: 16px;
     }
 
     button {

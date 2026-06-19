@@ -1,6 +1,7 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+const stageText = document.getElementById("stageText");
 const timerText = document.getElementById("timerText");
 const messageText = document.getElementById("messageText");
 const restartButton = document.getElementById("restartButton");
@@ -23,6 +24,48 @@ const GROUND_Y = 320;
 const GAME_TIME = 30;
 const RANKING_STORAGE_KEY = "jumpObstacleGameRankings";
 
+const STAGES = [
+    {
+        level: 1,
+        label: "1단계",
+        description: "몸풀기",
+        minTime: 0,
+        startSpeed: 6.5,
+        maxSpeed: 9,
+        speedIncrease: 0.25,
+        obstacleWidth: 40,
+        obstacleHeight: 50,
+        spawnMin: 260,
+        spawnRandom: 260
+    },
+    {
+        level: 2,
+        label: "2단계",
+        description: "속도 증가",
+        minTime: 10,
+        startSpeed: 8.5,
+        maxSpeed: 11.5,
+        speedIncrease: 0.35,
+        obstacleWidth: 46,
+        obstacleHeight: 58,
+        spawnMin: 210,
+        spawnRandom: 210
+    },
+    {
+        level: 3,
+        label: "3단계",
+        description: "최고 난이도",
+        minTime: 20,
+        startSpeed: 10.5,
+        maxSpeed: 14,
+        speedIncrease: 0.45,
+        obstacleWidth: 52,
+        obstacleHeight: 66,
+        spawnMin: 160,
+        spawnRandom: 170
+    }
+];
+
 let gameState = "ready";
 // ready, playing, win, lose
 
@@ -32,8 +75,10 @@ let animationId = null;
 let audioContext = null;
 let soundEnabled = true;
 
+let currentStage = 1;
 let currentGameResult = null;
 let finalSurvivalTime = 0;
+let finalStageReached = 1;
 let currentResultSaved = false;
 
 const player = {
@@ -63,13 +108,13 @@ function resetGame() {
     player.velocityY = 0;
     player.isJumping = false;
 
-    obstacle.x = CANVAS_WIDTH + 100;
-    obstacle.speed = 7;
-
     startTime = 0;
     currentGameResult = null;
     finalSurvivalTime = 0;
+    finalStageReached = 1;
     currentResultSaved = false;
+
+    applyStageConfig(STAGES[0], true);
 
     timerText.textContent = `남은 시간: ${GAME_TIME}초`;
     messageText.textContent = "Space 키를 눌러 게임 시작";
@@ -85,7 +130,7 @@ function startGame() {
 
     gameState = "playing";
     startTime = Date.now();
-    messageText.textContent = "장애물을 피하세요!";
+    messageText.textContent = "1단계 시작! 장애물을 피하세요!";
 
     hideNicknameBox();
     gameLoop();
@@ -215,6 +260,32 @@ function playLoseSound() {
     });
 }
 
+function playStageUpSound() {
+    const currentAudioContext = prepareSound();
+
+    if (!currentAudioContext) return;
+
+    const now = currentAudioContext.currentTime;
+
+    playTone(currentAudioContext, {
+        type: "square",
+        startFrequency: 420,
+        endFrequency: 760,
+        startTime: now,
+        duration: 0.12,
+        volume: 0.16
+    });
+
+    playTone(currentAudioContext, {
+        type: "triangle",
+        startFrequency: 760,
+        endFrequency: 980,
+        startTime: now + 0.12,
+        duration: 0.12,
+        volume: 0.16
+    });
+}
+
 function jump() {
     if (gameState === "ready") {
         startGame();
@@ -242,15 +313,74 @@ function updatePlayer() {
     }
 }
 
+function getStageConfigByElapsedTime(elapsedTime) {
+    if (elapsedTime >= STAGES[2].minTime) {
+        return STAGES[2];
+    }
+
+    if (elapsedTime >= STAGES[1].minTime) {
+        return STAGES[1];
+    }
+
+    return STAGES[0];
+}
+
+function getCurrentStageConfig() {
+    return STAGES[currentStage - 1];
+}
+
+function applyStageConfig(stageConfig, resetObstaclePosition) {
+    currentStage = stageConfig.level;
+
+    obstacle.width = stageConfig.obstacleWidth;
+    obstacle.height = stageConfig.obstacleHeight;
+    obstacle.y = GROUND_Y - obstacle.height;
+
+    if (resetObstaclePosition) {
+        obstacle.x = CANVAS_WIDTH + 100;
+        obstacle.speed = stageConfig.startSpeed;
+    } else {
+        obstacle.speed = Math.max(obstacle.speed, stageConfig.startSpeed);
+    }
+
+    updateStageText();
+}
+
+function updateStage() {
+    const elapsedTime = getElapsedSeconds();
+    const nextStageConfig = getStageConfigByElapsedTime(elapsedTime);
+
+    if (nextStageConfig.level !== currentStage) {
+        applyStageConfig(nextStageConfig, false);
+        playStageUpSound();
+        messageText.textContent = `${nextStageConfig.label} 진입! ${nextStageConfig.description} 구간입니다.`;
+    }
+}
+
+function updateStageText() {
+    const stageConfig = getCurrentStageConfig();
+    stageText.textContent = `현재 단계: ${stageConfig.label} - ${stageConfig.description}`;
+}
+
 function updateObstacle() {
+    const stageConfig = getCurrentStageConfig();
+
     obstacle.x -= obstacle.speed;
 
     if (obstacle.x + obstacle.width < 0) {
-        obstacle.x = CANVAS_WIDTH + Math.random() * 300;
-        obstacle.speed += 0.3;
+        obstacle.x = CANVAS_WIDTH + stageConfig.spawnMin + Math.random() * stageConfig.spawnRandom;
+        obstacle.width = stageConfig.obstacleWidth;
+        obstacle.height = stageConfig.obstacleHeight;
+        obstacle.y = GROUND_Y - obstacle.height;
 
-        if (obstacle.speed > 13) {
-            obstacle.speed = 13;
+        obstacle.speed += stageConfig.speedIncrease;
+
+        if (obstacle.speed < stageConfig.startSpeed) {
+            obstacle.speed = stageConfig.startSpeed;
+        }
+
+        if (obstacle.speed > stageConfig.maxSpeed) {
+            obstacle.speed = stageConfig.maxSpeed;
         }
     }
 }
@@ -268,17 +398,18 @@ function endGame(result) {
     gameState = result;
     currentGameResult = result;
     finalSurvivalTime = getElapsedSeconds();
+    finalStageReached = currentStage;
 
     cancelAnimationFrame(animationId);
 
     if (result === "win") {
-        messageText.textContent = "승리! 30초 동안 살아남았습니다!";
+        messageText.textContent = "승리! 3단계를 모두 클리어했습니다!";
         timerText.textContent = "남은 시간: 0초";
         playWinSound();
     }
 
     if (result === "lose") {
-        messageText.textContent = "패배! 장애물에 부딪혔습니다.";
+        messageText.textContent = `패배! ${currentStage}단계에서 장애물에 부딪혔습니다.`;
         playLoseSound();
     }
 
@@ -313,10 +444,24 @@ function drawBackground() {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    ctx.fillStyle = "#bfdbfe";
+    if (currentStage === 1) {
+        ctx.fillStyle = "#bfdbfe";
+    } else if (currentStage === 2) {
+        ctx.fillStyle = "#fde68a";
+    } else {
+        ctx.fillStyle = "#fecaca";
+    }
+
     ctx.fillRect(0, 0, CANVAS_WIDTH, 230);
 
-    ctx.fillStyle = "#86efac";
+    if (currentStage === 1) {
+        ctx.fillStyle = "#86efac";
+    } else if (currentStage === 2) {
+        ctx.fillStyle = "#65a30d";
+    } else {
+        ctx.fillStyle = "#4b5563";
+    }
+
     ctx.fillRect(0, GROUND_Y, CANVAS_WIDTH, CANVAS_HEIGHT - GROUND_Y);
 
     ctx.strokeStyle = "#1f2937";
@@ -328,6 +473,7 @@ function drawBackground() {
 
     drawCloud(140, 80);
     drawCloud(520, 100);
+    drawCanvasStageBadge();
 }
 
 function drawCloud(x, y) {
@@ -337,6 +483,20 @@ function drawCloud(x, y) {
     ctx.arc(x + 30, y - 10, 30, 0, Math.PI * 2);
     ctx.arc(x + 65, y, 25, 0, Math.PI * 2);
     ctx.fill();
+}
+
+function drawCanvasStageBadge() {
+    const stageConfig = getCurrentStageConfig();
+
+    ctx.fillStyle = "rgba(17, 24, 39, 0.85)";
+    ctx.fillRect(24, 24, 150, 46);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 20px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText(stageConfig.label, 42, 54);
+
+    ctx.textAlign = "left";
 }
 
 function drawPlayer() {
@@ -356,11 +516,23 @@ function drawPlayer() {
 }
 
 function drawObstacle() {
-    ctx.fillStyle = "#ef4444";
+    if (currentStage === 1) {
+        ctx.fillStyle = "#ef4444";
+    } else if (currentStage === 2) {
+        ctx.fillStyle = "#f97316";
+    } else {
+        ctx.fillStyle = "#7f1d1d";
+    }
+
     ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
 
-    ctx.fillStyle = "#991b1b";
-    ctx.fillRect(obstacle.x + 6, obstacle.y + 6, obstacle.width - 12, obstacle.height - 12);
+    ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+    ctx.fillRect(
+        obstacle.x + 6,
+        obstacle.y + 6,
+        obstacle.width - 12,
+        obstacle.height - 12
+    );
 }
 
 function drawResultOverlay() {
@@ -374,15 +546,25 @@ function drawResultOverlay() {
     ctx.textAlign = "center";
 
     if (gameState === "win") {
-        ctx.fillText("승리!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+        ctx.fillText("승리!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
     }
 
     if (gameState === "lose") {
-        ctx.fillText("패배!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+        ctx.fillText("패배!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
     }
 
     ctx.font = "24px Arial";
-    ctx.fillText("닉네임을 입력해 기록을 남겨보세요", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
+
+    if (gameState === "win") {
+        ctx.fillText("3단계까지 모두 클리어했습니다!", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20);
+    }
+
+    if (gameState === "lose") {
+        ctx.fillText(`${finalStageReached}단계까지 도달했습니다.`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20);
+    }
+
+    ctx.font = "20px Arial";
+    ctx.fillText("닉네임을 입력해 기록을 남겨보세요", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 60);
 
     ctx.textAlign = "left";
 }
@@ -397,6 +579,7 @@ function drawGame() {
 function gameLoop() {
     if (gameState !== "playing") return;
 
+    updateStage();
     updatePlayer();
     updateObstacle();
     checkCollision();
@@ -422,15 +605,16 @@ function showNicknameBox() {
     nicknameBox.classList.remove("hidden");
     nicknameInput.value = "";
     nicknameErrorText.textContent = "";
+    nicknameErrorText.style.color = "#dc2626";
     saveLogButton.disabled = false;
     saveLogButton.textContent = "기록 저장";
 
     if (currentGameResult === "win") {
-        resultSummaryText.textContent = `승리 기록! 생존 시간: ${finalSurvivalTime}초`;
+        resultSummaryText.textContent = `승리 기록! 3단계 클리어 / 생존 시간: ${finalSurvivalTime}초`;
     }
 
     if (currentGameResult === "lose") {
-        resultSummaryText.textContent = `패배 기록. 생존 시간: ${finalSurvivalTime}초`;
+        resultSummaryText.textContent = `패배 기록. 도달 단계: ${finalStageReached}단계 / 생존 시간: ${finalSurvivalTime}초`;
     }
 
     setTimeout(function() {
@@ -442,6 +626,7 @@ function hideNicknameBox() {
     nicknameBox.classList.add("hidden");
     nicknameInput.value = "";
     nicknameErrorText.textContent = "";
+    nicknameErrorText.style.color = "#dc2626";
 }
 
 function loadRankings() {
@@ -473,6 +658,10 @@ function sortRankings(rankings) {
             return b.survivalTime - a.survivalTime;
         }
 
+        if (b.stageReached !== a.stageReached) {
+            return b.stageReached - a.stageReached;
+        }
+
         return b.timestamp - a.timestamp;
     });
 }
@@ -480,6 +669,7 @@ function sortRankings(rankings) {
 function savePlayerLog() {
     if (currentResultSaved) {
         nicknameErrorText.textContent = "이미 이번 게임 기록을 저장했습니다.";
+        nicknameErrorText.style.color = "#dc2626";
         return;
     }
 
@@ -487,11 +677,13 @@ function savePlayerLog() {
 
     if (nickname.length === 0) {
         nicknameErrorText.textContent = "닉네임을 입력해주세요.";
+        nicknameErrorText.style.color = "#dc2626";
         return;
     }
 
     if (nickname.length > 10) {
         nicknameErrorText.textContent = "닉네임은 최대 10글자까지 가능합니다.";
+        nicknameErrorText.style.color = "#dc2626";
         return;
     }
 
@@ -501,6 +693,7 @@ function savePlayerLog() {
         nickname: nickname,
         result: currentGameResult,
         survivalTime: finalSurvivalTime,
+        stageReached: finalStageReached,
         playedAt: new Date().toLocaleString("ko-KR"),
         timestamp: Date.now()
     };
@@ -554,8 +747,10 @@ function renderRankings() {
         resultSpan.className = resultClass;
         resultSpan.textContent = resultText;
 
+        const stageReached = record.stageReached || 1;
+
         metaText.appendChild(resultSpan);
-        metaText.appendChild(document.createTextNode(` · ${record.playedAt}`));
+        metaText.appendChild(document.createTextNode(` · ${stageReached}단계 도달 · ${record.playedAt}`));
 
         mainBox.appendChild(nameText);
         mainBox.appendChild(metaText);
@@ -624,5 +819,6 @@ clearRankingButton.addEventListener("click", function() {
     clearRankings();
 });
 
+applyStageConfig(STAGES[0], true);
 renderRankings();
 drawGame();
