@@ -119,6 +119,36 @@ button:active {
     transform: translateY(0);
 }
 
+.volume-box {
+    max-width: 800px;
+    margin: 16px auto 0;
+    padding: 14px 18px;
+    background: #ffffff;
+    border: 2px solid #c4b5fd;
+    border-radius: 999px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 8px 20px rgba(139, 92, 246, 0.12);
+}
+
+.volume-box label {
+    font-weight: bold;
+    color: #4c1d95;
+}
+
+#bgmVolumeSlider {
+    width: 260px;
+    cursor: pointer;
+}
+
+#bgmVolumeText {
+    min-width: 44px;
+    font-weight: bold;
+    color: #7c3aed;
+}
+
 .nickname-box {
     max-width: 800px;
     margin: 24px auto 0;
@@ -293,6 +323,17 @@ button:active {
         width: 150px;
         padding: 11px 16px;
         font-size: 15px;
+    }
+
+    .volume-box {
+        flex-direction: column;
+        border-radius: 18px;
+        gap: 10px;
+    }
+
+    #bgmVolumeSlider {
+        width: 100%;
+        max-width: 260px;
     }
 
     .ranking-header {

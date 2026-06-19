@@ -7,6 +7,8 @@ const messageText = document.getElementById("messageText");
 const restartButton = document.getElementById("restartButton");
 const soundButton = document.getElementById("soundButton");
 const bgmButton = document.getElementById("bgmButton");
+const bgmVolumeSlider = document.getElementById("bgmVolumeSlider");
+const bgmVolumeText = document.getElementById("bgmVolumeText");
 
 const nicknameBox = document.getElementById("nicknameBox");
 const resultSummaryText = document.getElementById("resultSummaryText");
@@ -24,6 +26,7 @@ const CANVAS_HEIGHT = canvas.height;
 const GROUND_Y = 320;
 const GAME_TIME = 30;
 const RANKING_STORAGE_KEY = "jumpObstacleGameRankings";
+const BGM_MASTER_MAX_VOLUME = 0.3;
 
 const STAGES = [
     {
@@ -208,6 +211,34 @@ function prepareBgmSound() {
     return getAudioContext();
 }
 
+function getBgmTargetVolume() {
+    const sliderValue = Number(bgmVolumeSlider.value);
+    const volumeRatio = sliderValue / 100;
+
+    if (volumeRatio <= 0) {
+        return 0.0001;
+    }
+
+    return volumeRatio * BGM_MASTER_MAX_VOLUME;
+}
+
+function updateBgmVolumeText() {
+    bgmVolumeText.textContent = `${bgmVolumeSlider.value}%`;
+}
+
+function applyBgmVolume() {
+    updateBgmVolumeText();
+
+    if (!bgmGainNode || !audioContext) return;
+
+    const now = audioContext.currentTime;
+    const targetVolume = getBgmTargetVolume();
+
+    bgmGainNode.gain.cancelScheduledValues(now);
+    bgmGainNode.gain.setValueAtTime(bgmGainNode.gain.value, now);
+    bgmGainNode.gain.linearRampToValueAtTime(targetVolume, now + 0.1);
+}
+
 function playJumpSound() {
     const currentAudioContext = prepareEffectSound();
 
@@ -319,10 +350,11 @@ function startBgm() {
 
     const bgmGain = getBgmGainNode(currentAudioContext);
     const now = currentAudioContext.currentTime;
+    const targetVolume = getBgmTargetVolume();
 
     bgmGain.gain.cancelScheduledValues(now);
     bgmGain.gain.setValueAtTime(0.0001, now);
-    bgmGain.gain.linearRampToValueAtTime(0.08, now + 0.5);
+    bgmGain.gain.linearRampToValueAtTime(targetVolume, now + 0.5);
 
     playBgmLoop();
 }
@@ -979,6 +1011,10 @@ bgmButton.addEventListener("click", function() {
     }
 });
 
+bgmVolumeSlider.addEventListener("input", function() {
+    applyBgmVolume();
+});
+
 saveLogButton.addEventListener("click", function() {
     savePlayerLog();
 });
@@ -988,5 +1024,6 @@ clearRankingButton.addEventListener("click", function() {
 });
 
 applyStageConfig(STAGES[0], true);
+updateBgmVolumeText();
 renderRankings();
 drawGame();
